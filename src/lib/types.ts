@@ -22,6 +22,34 @@ export interface Division {
 export interface FighterDetails {
   id: string
   name: string
-  // Additional fields will be included based on actual API response
-  [key: string]: any
+  nickname?: string
+  category?: string
+  wins?: string
+  losses?: string
+  draws?: string
+  status?: string
+  placeOfBirth?: string
+  trainsAt?: string
+  fightingStyle?: string
+  age?: string
+  height?: string
+  weight?: string
+  reach?: string
+  legReach?: string
+  octagonDebut?: string
+  imgUrl?: string
+}
+
+// Fighters collection (from /fighters endpoint)
+export interface FightersCollection {
+  [fighterId: string]: FighterDetails
+}
+
+// Extended Fighter interface for use in components with additional data
+export interface ExtendedFighter extends Fighter {
+  nickname?: string
+  category?: string
+  record?: string
+  imgUrl?: string
+  status?: string
 }

@@ -1,4 +1,4 @@
-import { Division, FighterDetails } from './types'
+import { Division, FighterDetails, FightersCollection } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.octagon-api.com'
 
@@ -23,6 +23,30 @@ export async function getRankings(): Promise<Division[]> {
       throw new Error(`Failed to fetch rankings: ${error.message}`)
     }
     throw new Error('Failed to fetch rankings data')
+  }
+}
+
+/**
+ * Fetch all fighters data from the Octagon API
+ * @returns Promise<FightersCollection> - Object containing all fighters with detailed information
+ */
+export async function getFighters(): Promise<FightersCollection> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/fighters`, {
+      next: { revalidate: 86400 } // 24 hours cache
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch fighters data')
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch fighters: ${error.message}`)
+    }
+    throw new Error('Failed to fetch fighters data')
   }
 }
 

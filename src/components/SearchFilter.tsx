@@ -1,6 +1,13 @@
 'use client'
 
 import { Division } from '@/lib/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface SearchFilterProps {
   divisions: Division[]
@@ -20,26 +27,32 @@ export function SearchFilter({
   return (
     <div className="flex flex-col md:flex-row gap-4 mb-6">
       {/* Division Filter */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <label
           htmlFor="division-select"
           className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap"
         >
           Division:
         </label>
-        <select
-          id="division-select"
-          value={selectedDivision}
-          onChange={(e) => onDivisionChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-dark-card text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-ufc-red"
-        >
-          <option value="all">All Divisions</option>
-          {divisions.map((division) => (
-            <option key={division.id} value={division.id}>
-              {division.categoryName}
-            </option>
-          ))}
-        </select>
+        <Select value={selectedDivision} onValueChange={onDivisionChange}>
+          <SelectTrigger className="w-[200px] bg-white dark:bg-dark-card border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-ufc-red">
+            <SelectValue placeholder="Select a division" />
+          </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-dark-card border-gray-300 dark:border-gray-700">
+            <SelectItem value="all" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
+              All Divisions
+            </SelectItem>
+            {divisions.map((division) => (
+              <SelectItem
+                key={division.id}
+                value={division.id}
+                className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
+              >
+                {division.categoryName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Search Input */}
