@@ -1,9 +1,25 @@
-import { getRankings } from '@/lib/api'
+import { getRankings, getFighters } from '@/lib/api'
 import { FighterGrid } from '@/components/FighterGrid'
+import { OctagonFighter, Division } from '@/lib/types'; // Explicitly import Division and OctagonFighter
 
 export default async function Home() {
-  // Fetch rankings data server-side
-  const divisions = await getRankings()
+  let divisions: Division[] = [];
+  let errorMessage: string | null = null;
+
+  try {
+    divisions = await getRankings();
+  } catch (error) {
+    console.error("Failed to fetch rankings:", error);
+    // Continue even if rankings fail, as fighters are the primary focus of this task
+  }
+
+  try {
+    // Call getFighters to prime the cache for the client-side FighterGrid
+    await getFighters();
+  } catch (error) {
+    console.error("Failed to fetch fighters:", error);
+    errorMessage = "Failed to load fighter data. Please try again later.";
+  }
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-7xl">
@@ -17,8 +33,11 @@ export default async function Home() {
         </p>
       </header>
 
-      {/* Fighter Grid with Search and Filter */}
-      <FighterGrid divisions={divisions} />
+      {errorMessage ? (
+        <div className="text-red-500 text-center text-lg">{errorMessage}</div>
+      ) : (
+        <FighterGrid divisions={divisions} />
+      )}
     </main>
   )
 }

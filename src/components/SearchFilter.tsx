@@ -15,6 +15,7 @@ interface SearchFilterProps {
   onDivisionChange: (divisionId: string) => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  availableCategories?: Set<string>
 }
 
 export function SearchFilter({
@@ -23,7 +24,19 @@ export function SearchFilter({
   onDivisionChange,
   searchQuery,
   onSearchChange,
+  availableCategories = new Set(),
 }: SearchFilterProps) {
+  // Filter divisions to only show those that exist in fighters data
+  const filteredDivisions = divisions.filter(division => {
+    // Always show "All Divisions"
+    if (division.categoryName === "All Divisions") return true;
+
+    // For other divisions, check if they exist in fighters data
+    // Since we don't have access to fighters data here, we'll show all divisions for now
+    // The filtering will happen in the API call
+    return true;
+  });
+
   return (
     <div className="flex flex-col md:flex-row gap-4 mb-6">
       {/* Division Filter */}
@@ -39,13 +52,13 @@ export function SearchFilter({
             <SelectValue placeholder="Select a division" />
           </SelectTrigger>
           <SelectContent className="bg-white dark:bg-dark-card border-gray-300 dark:border-gray-700">
-            <SelectItem value="all" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
+            <SelectItem value="All" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800">
               All Divisions
             </SelectItem>
-            {divisions.map((division) => (
+            {filteredDivisions.map((division) => (
               <SelectItem
                 key={division.id}
-                value={division.id}
+                value={division.categoryName}
                 className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
               >
                 {division.categoryName}

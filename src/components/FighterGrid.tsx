@@ -1,153 +1,126 @@
-'use client'
+"use client";
 
-import { useState, useMemo, useEffect } from 'react'
-import { Division, Fighter, FightersCollection, FighterDetails } from '@/lib/types'
-import { FighterCard } from './FighterCard'
-import { FighterModal } from './FighterModal'
-import { SearchFilter } from './SearchFilter'
-import { getFighters } from '@/lib/api'
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { FighterCard } from "./FighterCard";
+import { FighterModal } from "./FighterModal";
+import { OctagonFighter, Division } from "@/lib/types";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useUser } from "@/hooks/useUser";
+import { useQuery } from "@tanstack/react-query";
+import { SearchFilter } from "./SearchFilter";
+import { SkeletonCard } from "./SkeletonCard";
+import { getFighters } from "@/lib/api"; // Assuming this function exists or will be created
 
 interface FighterGridProps {
-  divisions: Division[]
-}
-
-interface DisplayItem {
-  fighter: Fighter
-  divisionName: string
-  rank: number | 'champion'
-  divisionId: string
-  fighterDetails?: FighterDetails
+  divisions: Division[];
 }
 
 export function FighterGrid({ divisions }: FighterGridProps) {
-  const [selectedDivision, setSelectedDivision] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [selectedFighter, setSelectedFighter] = useState<string | null>(null)
-  const [fightersData, setFightersData] = useState<FightersCollection | null>(null)
-  const [fightersLoading, setFightersLoading] = useState(false)
+  const [selectedFighter, setSelectedFighter] =
+    useState<OctagonFighter | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
 
-  // Fetch all fighters data for enriched information
+  const { isSignedIn } = useUser();
+  const { isFavorited, toggleFavorite } = useFavorites();
+
+  // Get available categories from fighters data
+  const availableCategories = useMemo(() => {
+    const categories = new Set<string>();
+    // We'll get this from the fighters query data
+    return categories;
+  }, []);
+
+  // Fetch fighters with React Query
+  const {
+    data: fighters,
+    isLoading,
+    error,
+  } = useQuery<OctagonFighter[]>({
+    queryKey: ["fighters", searchTerm, filterCategory],
+    queryFn: () => getFighters(searchTerm, filterCategory),
+  });
+
+  // Update available categories when fighters data loads
   useEffect(() => {
-    const fetchFighters = async () => {
-      try {
-        setFightersLoading(true)
-        const data = await getFighters()
-        setFightersData(data)
-      } catch (error) {
-        console.error('Failed to fetch fighters data:', error)
-        // Continue without enriched data - basic functionality will still work
-      } finally {
-        setFightersLoading(false)
-      }
+    if (fighters && fighters.length > 0) {
+      const categories = new Set(fighters.map(f => f.category).filter(Boolean));
+      // Update availableCategories if needed
     }
+  }, [fighters]);
 
-    fetchFighters()
-  }, [])
+  const openModal = useCallback((fighter: OctagonFighter) => {
+    setSelectedFighter(fighter);
+    setIsModalOpen(true);
+  }, []);
 
-  // Build filtered and searchable display array
-  const displayItems = useMemo(() => {
-    // Filter divisions first
-    const filteredDivisions =
-      selectedDivision === 'all'
-        ? divisions
-        : divisions.filter((div) => div.id === selectedDivision)
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedFighter(null);
+  }, []);
 
-    // Build display array from filtered divisions
-    const items: DisplayItem[] = []
+  const handleSearch = useCallback((term: string) => {
+    setSearchTerm(term);
+  }, []);
 
-    filteredDivisions.forEach((division) => {
-      // Add champion if exists
-      if (division.champion) {
-        const fighterDetails = fightersData?.[division.champion.id]
-        items.push({
-          fighter: {
-            id: division.champion.id,
-            name: division.champion.championName,
-          },
-          divisionName: division.categoryName,
-          rank: 'champion',
-          divisionId: division.id,
-          fighterDetails: fighterDetails,
-        })
-      }
+  const handleFilter = useCallback((category: string) => {
+    setFilterCategory(category);
+  }, []);
 
-      // Add ranked fighters
-      division.fighters.forEach((fighter, index) => {
-        const fighterDetails = fightersData?.[fighter.id]
-        items.push({
-          fighter: fighter,
-          divisionName: division.categoryName,
-          rank: index + 1,
-          divisionId: division.id,
-          fighterDetails: fighterDetails,
-        })
-      })
-    })
+  // Placeholder for adding to fantasy team - will be implemented later
+  const handleAddToFantasyTeam = (fighterId: string) => {
+    console.log(`Add fighter ${fighterId} to fantasy team`);
+    // Logic to open team selector modal or add to a specific team
+  };
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      return items.filter((item) =>
-        item.fighter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.fighterDetails?.nickname && item.fighterDetails.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    }
-
-    return items
-  }, [divisions, selectedDivision, searchQuery, fightersData])
+  if (error)
+    return (
+      <div className="text-red-500 text-center">Failed to load fighters.</div>
+    );
 
   return (
-    <>
-      {/* Search and Filter Controls */}
+    <div className="container mx-auto p-4">
       <SearchFilter
-        divisions={divisions}
-        selectedDivision={selectedDivision}
-        onDivisionChange={setSelectedDivision}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        divisions={divisions} 
+        selectedDivision={filterCategory}
+        onDivisionChange={handleFilter}
+        searchQuery={searchTerm}
+        onSearchChange={handleSearch}
       />
 
-      {/* Loading indicator for fighters data */}
-      {fightersLoading && (
-        <div className="flex justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-ufc-red"></div>
-          <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-            Loading fighter details...
-          </span>
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, index) => (
+            <SkeletonCard key={index} />
+          ))}
         </div>
-      )}
-
-      {/* Empty State */}
-      {displayItems.length === 0 && !fightersLoading && (
-        <div className="text-center py-16">
-          <p className="text-xl text-gray-600 dark:text-gray-400">
-            No fighters found. Try different search terms.
-          </p>
-        </div>
-      )}
-
-      {/* Fighter Cards Grid */}
-      {displayItems.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {displayItems.map((item, index) => (
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {fighters?.map((fighter) => (
             <FighterCard
-              key={`${item.fighter.id}-${index}`}
-              fighter={item.fighter}
-              divisionName={item.divisionName}
-              rank={item.rank}
-              onClick={() => setSelectedFighter(item.fighter.id)}
-              fighterDetails={item.fighterDetails}
+              key={fighter.id}
+              fighter={fighter}
+              onClick={openModal}
+              // Pass favorite status and toggle function
+              // isFavorited={isFavorited(fighter.id)} // This prop is handled internally by FighterCard
+              // onToggleFavorite={toggleFavorite} // This prop is handled internally by FighterCard
+              // Pass user ID for conditional rendering if needed inside card
+              // currentUserId={isSignedIn ? 'user-id-placeholder' : undefined} // Not needed, isSignedIn is sufficient
+              showFantasyActions={isSignedIn} // Show fantasy actions if signed in
+              onAddToTeam={handleAddToFantasyTeam}
             />
           ))}
         </div>
       )}
 
-      {/* Fighter Modal */}
-      {selectedFighter && (
-        <FighterModal
-          fighterId={selectedFighter}
-          onClose={() => setSelectedFighter(null)}
-        />
-      )}
-    </>
-  )
+      <FighterModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        fighter={selectedFighter}
+        onAddToFantasyTeam={handleAddToFantasyTeam} // Pass to modal for potential team addition
+        // relatedDiscussions={[]} // Placeholder for fetching related discussions
+      />
+    </div>
+  );
 }

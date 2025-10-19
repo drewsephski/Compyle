@@ -1,308 +1,258 @@
-'use client'
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { XMarkIcon, HeartIcon, PlusIcon } from '@heroicons/react/24/outline'; // Adjust import for lucide-react if used elsewhere
+import { OctagonFighter } from '@/lib/types';
+import Image from 'next/image';
+import { Tab } from '@headlessui/react';
+import { useFavorites } from '@/hooks/useFavorites';
+import { useUser } from '@/hooks/useUser';
+import { cn } from '@/lib/utils';
 
-import { useEffect, useState } from 'react'
-import { getFighterDetails } from '@/lib/api'
-import { FighterDetails } from '@/lib/types'
-import { useToast } from '@/hooks/useToast'
-import { Toast } from './Toast'
 
 interface FighterModalProps {
-  fighterId: string
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  fighter: OctagonFighter | null;
+  onAddToFantasyTeam?: (fighterId: string) => void;
+  relatedDiscussions?: any[]; // Placeholder for actual discussion type
 }
 
-export function FighterModal({ fighterId, onClose }: FighterModalProps) {
-  const [fighterData, setFighterData] = useState<FighterDetails | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [imageError, setImageError] = useState(false)
-  const { toasts, showToast, removeToast } = useToast()
+export function FighterModal({
+  isOpen,
+  onClose,
+  fighter,
+  onAddToFantasyTeam,
+  relatedDiscussions,
+}: FighterModalProps) {
+  const { isSignedIn } = useUser();
+  const { isFavorited, toggleFavorite } = useFavorites();
 
-  useEffect(() => {
-    const fetchFighter = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        setImageError(false)
-        const data = await getFighterDetails(fighterId)
-        setFighterData(data)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unable to load fighter details.'
-        setError(errorMessage)
-        showToast(errorMessage, 'error')
-      } finally {
-        setLoading(false)
-      }
+  if (!fighter) return null;
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSignedIn) {
+      toggleFavorite(fighter.id);
+    } else {
+      alert('Please sign in to favorite fighters.');
     }
+  };
 
-    fetchFighter()
-
-    // Handle escape key
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
+  const handleAddToTeam = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSignedIn && onAddToFantasyTeam) {
+      onAddToFantasyTeam(fighter.id);
+    } else if (!isSignedIn) {
+      alert('Please sign in to add fighters to your team.');
     }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [fighterId, onClose, showToast])
-
-  // Disable body scroll when modal is open
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [])
-
-  const formatRecord = (wins?: string, losses?: string, draws?: string) => {
-    if (!wins && !losses && !draws) return 'N/A'
-    return `${wins || '0'}-${losses || '0'}-${draws || '0'}`
-  }
-
-  const formatHeight = (height?: string) => {
-    if (!height) return 'N/A'
-    const inches = parseFloat(height)
-    if (isNaN(inches)) return height
-    const feet = Math.floor(inches / 12)
-    const remainingInches = inches % 12
-    return `${feet}'${remainingInches}"`
-  }
+  };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        {/* Modal Content */}
-        <div
-          className="bg-white dark:bg-dark-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
+    <Transition.Root show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors z-10"
-            aria-label="Close modal"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-6 h-6"
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Loading State */}
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ufc-red mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Loading fighter details...</p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {error && !loading && (
-            <div className="text-center py-12">
-              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-ufc-red text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {/* Fighter Data */}
-          {fighterData && !loading && !error && (
-            <div className="p-6">
-              {/* Header Section with Image and Basic Info */}
-              <div className="flex flex-col lg:flex-row gap-6 mb-8">
-                {/* Fighter Image */}
-                <div className="flex-shrink-0">
-                  {fighterData.imgUrl && !imageError ? (
-                    <img
-                      src={fighterData.imgUrl}
-                      alt={fighterData.name}
-                      className="w-48 h-64 object-cover rounded-lg shadow-lg"
-                      onError={() => setImageError(true)}
-                    />
-                  ) : (
-                    <div className="w-48 h-64 bg-gray-300 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                      <span className="text-gray-500 dark:text-gray-400 text-sm text-center px-4">
-                        Image not available
-                      </span>
-                    </div>
-                  )}
+              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-gray-900 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl sm:p-6">
+                <div className="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
+                  <button
+                    type="button"
+                    className="rounded-md bg-gray-900 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    onClick={onClose}
+                  >
+                    <span className="sr-only">Close</span>
+                    <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                  </button>
                 </div>
-
-                {/* Basic Information */}
-                <div className="flex-1">
-                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    {fighterData.name}
-                  </h2>
-
-                  {fighterData.nickname && (
-                    <p className="text-xl text-ufc-red font-semibold mb-3">
-                      "{fighterData.nickname}"
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Status
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.status || 'N/A'}
-                      </dd>
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                    <Dialog.Title as="h3" className="text-2xl font-semibold leading-6 text-white flex justify-between items-center">
+                      {fighter.name}
+                      <div className="flex items-center space-x-2">
+                        {isSignedIn && onAddToFantasyTeam && (
+                          <button
+                            onClick={handleAddToTeam}
+                            className="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
+                          >
+                            <PlusIcon className="h-4 w-4" /> Add to Team
+                          </button>
+                        )}
+                        {isSignedIn && (
+                          <button
+                            onClick={handleToggleFavorite}
+                            className="p-1 rounded-full bg-gray-800 text-red-500 hover:text-red-400"
+                            aria-label="Toggle Favorite"
+                          >
+                            <HeartIcon className="h-5 w-5" fill={isFavorited(fighter.id) ? 'currentColor' : 'none'} />
+                          </button>
+                        )}
+                      </div>
+                    </Dialog.Title>
+                    {fighter.nickname && (
+                      <p className="text-sm text-gray-400 italic">"{fighter.nickname}"</p>
+                    )}
+                    {fighter.image && (
+                      <div className="relative w-64 h-64 mx-auto">
+                        <Image
+                          src={fighter.image}
+                          alt={fighter.name}
+                          layout="fill"
+                          objectFit="contain"
+                          className="rounded-sm"
+                        />
+                      </div>
+                    )}
+                    <div className="mt-2 space-y-2">
+                      {fighter.wins && fighter.losses && (
+                        <p className="text-sm text-gray-300">
+                          Record: {fighter.wins}-{fighter.losses}
+                          {fighter.draws && fighter.draws !== '0' ? `-${fighter.draws}` : ''}
+                        </p>
+                      )}
+                      {fighter.ranking && (
+                        <p className="text-sm text-gray-300">Rank: #{fighter.ranking}</p>
+                      )}
+                      {fighter.category && (
+                        <p className="text-sm text-gray-300">Division: {fighter.category}</p>
+                      )}
+                      {fighter.status && (
+                        <p className="text-sm text-gray-300">Status: {fighter.status}</p>
+                      )}
                     </div>
 
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Division
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.category || 'N/A'}
-                      </dd>
-                    </div>
+                    <Tab.Group>
+                      <Tab.List className="flex space-x-1 rounded-xl bg-gray-700 p-1 mt-4">
+                        <Tab
+                          className={({ selected }) =>
+                            cn(
+                              'w-full rounded-lg py-2.5 text-sm font-medium leading-5 text-white',
+                              'ring-white/60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
+                              selected
+                                ? 'bg-white text-gray-900 shadow'
+                                : 'text-blue-100 hover:bg-white/[0.12] hover:text-white'
+                            )
+                          }
+                        >
+                          Stats
+                        </Tab>
+                        <Tab
+                          className={({ selected }) =>
+                            cn(
+                              'w-full rounded-lg py-2.5 text-sm font-medium leading-5 text-white',
+                              'ring-white/60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
+                              selected
+                                ? 'bg-white text-gray-900 shadow'
+                                : 'text-blue-100 hover:bg-white/[0.12] hover:text-white'
+                            )
+                          }
+                        >
+                          Discussions
+                        </Tab>
+                      </Tab.List>
+                      <Tab.Panels className="mt-2">
+                        <Tab.Panel
+                          className={cn(
+                            'rounded-xl bg-gray-800 p-3',
+                            'ring-white/60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2'
+                          )}
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Physical Stats */}
+                            <div>
+                              <h4 className="text-lg font-bold text-white mb-3">Physical Stats</h4>
+                              <div className="space-y-2">
+                                {fighter.age && (
+                                  <p className="text-sm text-gray-300">Age: {fighter.age} years</p>
+                                )}
+                                {fighter.height && (
+                                  <p className="text-sm text-gray-300">Height: {fighter.height}"</p>
+                                )}
+                                {fighter.weight && (
+                                  <p className="text-sm text-gray-300">Weight: {fighter.weight} lbs</p>
+                                )}
+                                {fighter.reach && (
+                                  <p className="text-sm text-gray-300">Reach: {fighter.reach}"</p>
+                                )}
+                                {fighter.legReach && (
+                                  <p className="text-sm text-gray-300">Leg Reach: {fighter.legReach}"</p>
+                                )}
+                              </div>
+                            </div>
 
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Record
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {formatRecord(fighterData.wins, fighterData.losses, fighterData.draws)}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Age
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.age ? `${fighterData.age} years` : 'N/A'}
-                      </dd>
-                    </div>
+                            {/* Career Stats */}
+                            <div>
+                              <h4 className="text-lg font-bold text-white mb-3">Career Info</h4>
+                              <div className="space-y-2">
+                                {fighter.fightingStyle && (
+                                  <p className="text-sm text-gray-300">Fighting Style: {fighter.fightingStyle}</p>
+                                )}
+                                {fighter.trainsAt && (
+                                  <p className="text-sm text-gray-300">Trains At: {fighter.trainsAt}</p>
+                                )}
+                                {fighter.placeOfBirth && (
+                                  <p className="text-sm text-gray-300">Place of Birth: {fighter.placeOfBirth}</p>
+                                )}
+                                {fighter.octagonDebut && (
+                                  <p className="text-sm text-gray-300">UFC Debut: {fighter.octagonDebut}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Tab.Panel>
+                        <Tab.Panel
+                          className={cn(
+                            'rounded-xl bg-gray-800 p-3',
+                            'ring-white/60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2'
+                          )}
+                        >
+                          {/* Related discussions content */}
+                          <h4 className="text-lg font-bold text-white mb-2">Related Discussions</h4>
+                          {relatedDiscussions && relatedDiscussions.length > 0 ? (
+                            <ul>
+                              {relatedDiscussions.map((discussion) => (
+                                <li key={discussion.id} className="text-sm text-gray-300 mb-1">
+                                  <a href={`/discussions/${discussion.id}`} className="hover:underline">
+                                    {discussion.title} by {discussion.author.displayName}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-gray-400">No discussions found for this fighter.</p>
+                          )}
+                          <button className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            Start New Discussion
+                          </button>
+                        </Tab.Panel>
+                      </Tab.Panels>
+                    </Tab.Group>
                   </div>
                 </div>
-              </div>
-
-              {/* Detailed Information Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Physical Attributes */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
-                    Physical Attributes
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Height
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {formatHeight(fighterData.height)}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Weight
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.weight ? `${fighterData.weight} lbs` : 'N/A'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Reach
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.reach ? `${fighterData.reach}"` : 'N/A'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Leg Reach
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.legReach ? `${fighterData.legReach}"` : 'N/A'}
-                      </dd>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Career Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
-                    Career Information
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Fighting Style
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.fightingStyle || 'N/A'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Trains At
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.trainsAt || 'N/A'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Place of Birth
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.placeOfBirth || 'N/A'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase mb-1">
-                        Octagon Debut
-                      </dt>
-                      <dd className="text-base text-gray-900 dark:text-white">
-                        {fighterData.octagonDebut || 'N/A'}
-                      </dd>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
         </div>
-      </div>
-
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {toasts.map((toast) => (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => removeToast(toast.id)}
-          />
-        ))}
-      </div>
-    </>
-  )
+      </Dialog>
+    </Transition.Root>
+  );
 }

@@ -1,0 +1,332 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  clerkId         String           @unique
+  email           String           @unique
+  username        String?          @unique
+  displayName     String?
+  avatar          String?
+  bio             String?
+  joinDate        DateTime         @default(now())
+  subscription    SubscriptionTier @default(FREE)
+  role            UserRole         @default(USER)
+  preferences     UserPreferences?
+  leagues         LeagueMember[]
+  teams           FantasyTeam[]
+  favorites       UserFavorite[]
+  threads         DiscussionThread[]
+  comments        DiscussionComment[]
+  commentLikes    CommentLike[]
+  achievements    UserAchievement[]
+  followers       UserFollow[]     @relation("Following")
+  following       UserFollow[]     @relation("Follower")
+  sentMessages    PrivateMessage[] @relation("SentMessages")
+  receivedMessages PrivateMessage[] @relation("ReceivedMessages")
+  commissionedLeagues FantasyLeague[]
+}
+
+model UserPreferences {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailNotifications Boolean @default(true)
+  theme             String  @default("system")
+  privacySettings   Json?
+}
+
+model FantasyLeague {
+  id            String         @id @default(cuid())
+  commissionerId String
+  commissioner  User           @relation(fields: [commissionerId], references: [id])
+  name          String
+  description   String?
+  maxMembers    Int
+  entryFee      Float          @default(0)
+  prizePool     Float          @default(0)
+  startDate     DateTime
+  endDate       DateTime
+  status        LeagueStatus   @default(UPCOMING)
+  rules         Json?
+  members       LeagueMember[]
+  teams         FantasyTeam[]
+  discussions   DiscussionThread[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  @@index([commissionerId])
+}
+
+model LeagueMember {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leagueId  String
+  league    FantasyLeague @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  joinDate  DateTime    @default(now())
+  role      LeagueRole  @default(MEMBER)
+
+  @@unique([userId, leagueId])
+  @@index([leagueId])
+}
+
+model FantasyTeam {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leagueId    String
+  league      FantasyLeague    @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  name        String
+  budget      Float            @default(50000)
+  budgetUsed  Float            @default(0)
+  totalScore  Float            @default(0)
+  weeklyScore Float            @default(0)
+  roster      FantasyFighter[]
+  teamScores  TeamScore[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([userId, leagueId])
+  @@index([leagueId])
+}
+
+model FantasyFighter {
+  id              String      @id @default(cuid())
+  teamId          String
+  team            FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  fighterId       String // Corresponds to Octagon API fighter ID or cached Fighter ID
+  position        FighterPosition @default(BENCH)
+  acquisitionCost Float
+  currentValue    Float
+  weeklyScore     Float       @default(0)
+  
+  fighter         Fighter     @relation(fields: [fighterId], references: [id])
+
+  @@index([teamId])
+  @@index([fighterId])
+}
+
+model FightScore {
+  id          String   @id @default(cuid())
+  fighterId   String
+  eventId     String
+  baseScore   Float
+  bonuses     Json?
+  penalties   Json?
+  totalScore  Float
+  createdAt   DateTime @default(now())
+  
+  fighter     Fighter @relation(fields: [fighterId], references: [id])
+  event       Event   @relation(fields: [eventId], references: [id])
+
+  @@unique([fighterId, eventId])
+  @@index([eventId])
+}
+
+model TeamScore {
+  id        String      @id @default(cuid())
+  teamId    String
+  team      FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  weekId    String // e.g., "2024-42"
+  totalScore Float
+  rank      Int
+  createdAt DateTime    @default(now())
+
+  @@index([teamId])
+  @@index([weekId])
+}
+
+model UserFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fighterId String
+  fighter   Fighter  @relation(fields: [fighterId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, fighterId])
+}
+
+model DiscussionThread {
+  id        String              @id @default(cuid())
+  title     String
+  content   String
+  authorId  String
+  author    User                @relation(fields: [authorId], references: [id])
+  category  DiscussionCategory  @default(GENERAL)
+  fighterId String?
+  fighter   Fighter?            @relation(fields: [fighterId], references: [id])
+  eventId   String?
+  event     Event?              @relation(fields: [eventId], references: [id])
+  leagueId  String?
+  league    FantasyLeague?      @relation(fields: [leagueId], references: [id])
+  isPinned  Boolean             @default(false)
+  isLocked  Boolean             @default(false)
+  comments  DiscussionComment[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([authorId])
+  @@index([category])
+  @@index([fighterId])
+  @@index([leagueId])
+}
+
+model DiscussionComment {
+  id          String              @id @default(cuid())
+  threadId    String
+  thread      DiscussionThread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User                @relation(fields: [authorId], references: [id])
+  content     String
+  parentId    String?
+  parent      DiscussionComment?  @relation("Replies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies     DiscussionComment[] @relation("Replies")
+  likes       CommentLike[]
+  likesCount  Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([threadId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model CommentLike {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commentId String
+  comment   DiscussionComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@unique([userId, commentId])
+}
+
+model UserFollow {
+  followerId String
+  follower   User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following  User   @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([followerId, followingId])
+}
+
+model Achievement {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  description  String
+  icon         String
+  users        UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  earnedAt      DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model PrivateMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+// Cached UFC Data
+model Fighter {
+  id              String           @id @default(cuid()) // Our internal ID
+  octagonId       String?          @unique // ID from Octagon API
+  name            String
+  nickname        String?
+  category        String?
+  record          String?
+  stats           Json?
+  favorites       UserFavorite[]
+  threads         DiscussionThread[]
+  fantasyFighters FantasyFighter[]
+  fightScores     FightScore[]
+  fightsAsFighter1 Fight[]          @relation("Fighter1")
+  fightsAsFighter2 Fight[]          @relation("Fighter2")
+}
+
+model Event {
+  id          String           @id @default(cuid())
+  name        String
+  date        DateTime
+  location    String?
+  status      String
+  fights      Fight[]
+  threads     DiscussionThread[]
+  fightScores FightScore[]
+}
+
+model Fight {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  fighter1Id String
+  fighter1  Fighter  @relation("Fighter1", fields: [fighter1Id], references: [id])
+  fighter2Id String
+  fighter2  Fighter  @relation("Fighter2", fields: [fighter2Id], references: [id])
+  result    String?
+  method    String?
+  round     Int?
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  COMMISSIONER
+}
+
+enum LeagueStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+}
+
+enum LeagueRole {
+  MEMBER
+  COMMISSIONER
+}
+
+enum FighterPosition {
+  MAIN
+  BENCH
+}
+
+enum DiscussionCategory {
+  GENERAL
+  FIGHTER
+  EVENT
+  FANTASY
+}
